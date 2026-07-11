@@ -14,6 +14,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Clock;
 import java.util.List;
 
 import static com.example.app.jooq.generated.Tables.PERSON;
@@ -26,12 +27,14 @@ class PersonApiTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
     private static DSLContext dsl;
+    private static Clock clock;
 
     private final ObjectMapper json = new ObjectMapper();
 
     @BeforeAll
     static void initDatabase() {
         dsl = Database.init(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+        clock = Clock.systemUTC();
     }
 
     @BeforeEach
@@ -40,7 +43,7 @@ class PersonApiTest {
     }
 
     private Javalin app() {
-        return App.createApp(dsl);
+        return App.createApp(dsl, clock);
     }
 
     @Test

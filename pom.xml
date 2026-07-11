@@ -210,6 +210,13 @@
                                                     <value>POSTGRES</value>
                                                 </property>
                                             </properties>
+                                            <forcedTypes>
+                                                <forcedType>
+                                                    <userType>java.time.Instant</userType>
+                                                    <converter>org.jooq.Converter.of(java.time.OffsetDateTime.class, java.time.Instant.class, java.time.OffsetDateTime::toInstant, i -> i.atOffset(java.time.ZoneOffset.UTC))</converter>
+                                                    <includeTypes>(?i:TIMESTAMPTZ|TIMESTAMP\s+WITH\s+TIME\s+ZONE)</includeTypes>
+                                                </forcedType>
+                                            </forcedTypes>
                                         </database>
                                         <generate>
                                             <pojos>true</pojos>
