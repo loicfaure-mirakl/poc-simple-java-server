@@ -1,0 +1,6 @@
+target/
+data/
+*.class
+dependency-reduced-pom.xml
+.idea/
+.claude/
