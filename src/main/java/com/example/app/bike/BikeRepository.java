@@ -12,4 +12,7 @@ public interface BikeRepository {
     List<Bike> findAll();
 
     Bike create(String code);
+
+    Optional<Bike> reserve(UUID uuid);
+
 }

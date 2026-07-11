@@ -39,4 +39,14 @@ public class BikeRepositoryImpl implements BikeRepository {
                 .returning()
                 .fetchOneInto(Bike.class);
     }
+
+    @Override
+    public Optional<Bike> reserve(UUID uuid) {
+        return dsl.update(BIKE)
+                .set(BIKE.STATUS, Status.RESERVED.name())
+                .where(BIKE.ID.eq(uuid))
+                .and(BIKE.STATUS.eq(Status.AVAILABLE.name()))
+                .returning()
+                .fetchOptionalInto(Bike.class);
+    }
 }

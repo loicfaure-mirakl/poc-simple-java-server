@@ -1,5 +1,7 @@
 package com.example.app.reservation;
 
+import com.example.app.cqrs.CommandHandler;
+import com.example.app.reservation.domain.Reservation;
 import io.javalin.apibuilder.EndpointGroup;
 import org.jooq.DSLContext;
 
@@ -9,12 +11,16 @@ public class ReservationModule {
     private ReservationModule() {
     }
 
-    public static EndpointGroup routes(DSLContext dsl, Clock clock) {
+    public record Routes(EndpointGroup endpoints, CommandHandler<CreateReservationCommand, Reservation> createReservationCommand) {
+    }
+
+    public static Routes routes(DSLContext dsl, Clock clock) {
         ReservationRepository repository = new ReservationRepositoryImpl(dsl, clock);
+        var createReservationCommand = new CreateReservationCommandHandler(repository);
         ReservationController controller = new ReservationController(
                 new ReservationQueryService(repository),
-                new CreateReservationCommandHandler(repository),
+                createReservationCommand,
                 new UpdateReservationStatusCommandHandler(repository));
-        return controller::registerRoutes;
+        return new Routes(controller::registerRoutes, createReservationCommand);
     }
 }

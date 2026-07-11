@@ -2,6 +2,7 @@ package com.example.app.bike;
 
 import com.example.app.bike.domain.Bike;
 import com.example.app.cqrs.CommandHandler;
+import com.example.app.reservation.domain.Reservation;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 
@@ -13,16 +14,25 @@ import static io.javalin.apibuilder.ApiBuilder.post;
 public class BikeController {
     private final BikeQueryService bikeQueryService;
     private final CommandHandler<CreateBikeCommand, Bike> createBikeCommand;
+    private final CommandHandler<ReserveBikeCommand, Reservation> reserveBikeHandler;
 
-    public BikeController(BikeQueryService bikeQueryService, CommandHandler<CreateBikeCommand, Bike> createBikeCommand) {
+    public BikeController(BikeQueryService bikeQueryService, CommandHandler<CreateBikeCommand, Bike> createBikeCommand, CommandHandler<ReserveBikeCommand, Reservation> reserveBikeHandler) {
         this.bikeQueryService = bikeQueryService;
         this.createBikeCommand = createBikeCommand;
+        this.reserveBikeHandler = reserveBikeHandler;
     }
 
     void registerRoutes() {
         get("/bikes", this::getBikes);
         get("/bikes/{id}", this::findBike);
         post("/bikes", this::createBikes);
+        post("/bikes/{id}/reserve", this::reserve);
+    }
+
+    private void reserve(Context context) {
+        UUID bikeId = UUID.fromString(context.pathParam("id"));
+        var reservation = reserveBikeHandler.handle(new ReserveBikeCommand(bikeId));
+        context.status(HttpStatus.CREATED).json(reservation);
     }
 
     private void findBike(Context context) {
