@@ -3,8 +3,6 @@ package com.example.app.bike;
 import com.example.app.bike.domain.Bike;
 import com.example.app.cqrs.CommandHandler;
 
-import java.util.UUID;
-
 public class CreateBikeCommandHandler implements CommandHandler<CreateBikeCommand, Bike> {
 
     private final BikeRepository repository;

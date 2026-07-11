@@ -45,12 +45,18 @@ public class ReservationRepositoryImpl implements ReservationRepository {
 
     @Override
     public Optional<Reservation> updateStatus(UUID uuid, ReservationStatus reservationStatus) {
-        dsl.update(RESERVATION)
+        return dsl.update(RESERVATION)
                 .set(RESERVATION.STATUS, reservationStatus.name())
                 .where(RESERVATION.ID.eq(uuid))
-                .execute();
-        return dsl.selectFrom(RESERVATION)
-                .where(RESERVATION.ID.eq(uuid))
+                .and(RESERVATION.STATUS.ne(reservationStatus.name()))
+                .returning()
                 .fetchOptionalInto(Reservation.class);
+    }
+
+    @Override
+    public List<Reservation> findByStatus(ReservationStatus status) {
+        return dsl.selectFrom(RESERVATION)
+                .where(RESERVATION.STATUS.eq(status.name()))
+                .fetchInto(Reservation.class);
     }
 }

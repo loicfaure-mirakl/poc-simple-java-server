@@ -15,4 +15,6 @@ public interface BikeRepository {
 
     Optional<Bike> reserve(UUID uuid);
 
+    Optional<Bike> release(UUID uuid);
+
 }

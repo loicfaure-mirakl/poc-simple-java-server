@@ -1,6 +1,7 @@
 package com.example.app.bike;
 
 import com.example.app.bike.domain.Bike;
+import com.example.app.booking.ReserveBikeCommand;
 import com.example.app.cqrs.CommandHandler;
 import com.example.app.reservation.domain.Reservation;
 import io.javalin.http.Context;

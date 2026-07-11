@@ -1,4 +1,4 @@
-package com.example.app.bike;
+package com.example.app.booking;
 
 import java.util.UUID;
 

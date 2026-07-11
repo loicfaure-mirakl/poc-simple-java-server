@@ -15,4 +15,6 @@ public interface ReservationRepository {
     Reservation create(UUID bikeId);
 
     Optional<Reservation> updateStatus(UUID uuid, ReservationStatus reservationStatus);
+
+    List<Reservation> findByStatus(ReservationStatus status);
 }

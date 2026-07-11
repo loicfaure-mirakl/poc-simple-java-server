@@ -2,7 +2,6 @@ package com.example.app.bike;
 
 import com.example.app.bike.domain.Bike;
 import com.example.app.bike.domain.Status;
-import com.example.app.jooq.generated.Tables;
 import org.jooq.DSLContext;
 
 import java.util.List;
@@ -46,6 +45,16 @@ public class BikeRepositoryImpl implements BikeRepository {
                 .set(BIKE.STATUS, Status.RESERVED.name())
                 .where(BIKE.ID.eq(uuid))
                 .and(BIKE.STATUS.eq(Status.AVAILABLE.name()))
+                .returning()
+                .fetchOptionalInto(Bike.class);
+    }
+
+    @Override
+    public Optional<Bike> release(UUID uuid) {
+        return dsl.update(BIKE)
+                .set(BIKE.STATUS, Status.AVAILABLE.name())
+                .where(BIKE.ID.eq(uuid))
+                .and(BIKE.STATUS.eq(Status.RESERVED.name()))
                 .returning()
                 .fetchOptionalInto(Bike.class);
     }

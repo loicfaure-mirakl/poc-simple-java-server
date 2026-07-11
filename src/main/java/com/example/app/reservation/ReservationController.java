@@ -1,5 +1,6 @@
 package com.example.app.reservation;
 
+import com.example.app.booking.CancelReservationCommand;
 import com.example.app.reservation.domain.Reservation;
 import com.example.app.cqrs.CommandHandler;
 import com.example.app.reservation.domain.ReservationStatus;
@@ -16,13 +17,16 @@ import static io.javalin.apibuilder.ApiBuilder.put;
 public class ReservationController {
     private final ReservationQueryService reservationQueryService;
     private final CommandHandler<CreateReservationCommand, Reservation> createReservationCommand;
+    private final CommandHandler<CancelReservationCommand, Reservation> cancelReservationCommand;
     private final CommandHandler<UpdateReservationStatusCommand, Optional<Reservation>> updateReservationCommandHandler;
 
     public ReservationController(ReservationQueryService reservationQueryService,
                                  CommandHandler<CreateReservationCommand, Reservation> createReservationCommand,
+                                 CommandHandler<CancelReservationCommand, Reservation> cancelReservationCommand,
                                  CommandHandler<UpdateReservationStatusCommand, Optional<Reservation>> updateReservationCommandHandler) {
         this.reservationQueryService = reservationQueryService;
         this.createReservationCommand = createReservationCommand;
+        this.cancelReservationCommand = cancelReservationCommand;
         this.updateReservationCommandHandler = updateReservationCommandHandler;
     }
 
@@ -36,12 +40,8 @@ public class ReservationController {
 
     private void cancelReservation(Context context) {
         UUID reservationId = UUID.fromString(context.pathParam("id"));
-
-        updateReservationCommandHandler.handle(new UpdateReservationStatusCommand(reservationId, ReservationStatus.CANCELLED))
-                .ifPresentOrElse(
-                        context::json,
-                        () -> context.status(404).result("Reservation not found")
-                );
+        Reservation reservation = cancelReservationCommand.handle(new CancelReservationCommand(reservationId));
+        context.json(reservation);
     }
 
     private void finishReservation(Context context) {
