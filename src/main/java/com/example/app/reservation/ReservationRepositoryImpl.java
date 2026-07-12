@@ -5,6 +5,7 @@ import com.example.app.reservation.domain.ReservationStatus;
 import org.jooq.DSLContext;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +68,14 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     public List<Reservation> findBlocked() {
         return dsl.selectFrom(RESERVATION)
                 .where(RESERVATION.STATUS.in(ReservationStatus.CANCELLED.name(), ReservationStatus.RETURNED.name()))
+                .fetchInto(Reservation.class);
+    }
+
+    @Override
+    public List<Reservation> findStales(Duration ttl) {
+        return dsl.selectFrom(RESERVATION)
+                .where(RESERVATION.STATUS.eq(ReservationStatus.CREATED.name()))
+                .and(RESERVATION.CREATED_AT.le(clock.instant().minus(ttl)))
                 .fetchInto(Reservation.class);
     }
 }

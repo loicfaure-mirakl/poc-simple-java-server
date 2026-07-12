@@ -30,7 +30,7 @@ public class CancelReservationUseCase implements CommandHandler<CancelReservatio
     @Override
     public Reservation handle(CancelReservationCommand command) {
         // Cancellation is the durable, primary fact here — it's already committed and correct
-        // the moment updateStatus succeeds. Releasing the bike is a necessary but separate
+        // the moment cancel succeeds. Releasing the bike is a necessary but separate
         // side effect on the other aggregate: if it keeps failing we do NOT undo the
         // cancellation (that would misrepresent a decision the caller already made); we retry
         // a few times inline, and if it's still stuck, BikeReservationReconciler catches up later.

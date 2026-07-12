@@ -7,6 +7,7 @@ import com.example.app.bike.UpdateBikeStatusCommand;
 import com.example.app.bike.UpdateBikeStatusCommandHandler;
 import com.example.app.bike.domain.Bike;
 import com.example.app.booking.BikeReservationReconciler;
+import com.example.app.booking.ExpireReservationUseCase;
 import com.example.app.config.AppConfig;
 import com.example.app.config.Database;
 import com.example.app.cqrs.CommandHandler;
@@ -15,6 +16,7 @@ import com.example.app.error.NotFoundException;
 import com.example.app.person.PersonModule;
 import com.example.app.reservation.CreateReservationCommand;
 import com.example.app.reservation.CreateReservationCommandHandler;
+import com.example.app.reservation.ReservationExpiryJob;
 import com.example.app.reservation.ReservationModule;
 import com.example.app.reservation.ReservationRepository;
 import com.example.app.reservation.ReservationRepositoryImpl;
@@ -28,12 +30,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static io.javalin.apibuilder.ApiBuilder.get;
+import static java.time.temporal.ChronoUnit.MINUTES;
 
 public class App {
 
@@ -46,11 +50,7 @@ public class App {
         BikeRepository bikeRepository = new BikeRepositoryImpl(dsl);
         ReservationRepository reservationRepository = new ReservationRepositoryImpl(dsl, clock);
 
-        Javalin app = createApp(dsl, bikeRepository, reservationRepository);
-
-        var reconciler = new BikeReservationReconciler(reservationRepository, bikeRepository);
-        Executors.newSingleThreadScheduledExecutor()
-                .scheduleWithFixedDelay(reconciler::reconcileCancelledReservations, 5, 5, TimeUnit.SECONDS);
+        Javalin app = createApp(dsl, clock, bikeRepository, reservationRepository);
 
         int port = AppConfig.serverPort();
         app.start(port);
@@ -58,10 +58,10 @@ public class App {
     }
 
     public static Javalin createApp(DSLContext dsl, Clock clock) {
-        return createApp(dsl, new BikeRepositoryImpl(dsl), new ReservationRepositoryImpl(dsl, clock));
+        return createApp(dsl, clock, new BikeRepositoryImpl(dsl), new ReservationRepositoryImpl(dsl, clock));
     }
 
-    public static Javalin createApp(DSLContext dsl, BikeRepository bikeRepository, ReservationRepository reservationRepository) {
+    public static Javalin createApp(DSLContext dsl, Clock clock, BikeRepository bikeRepository, ReservationRepository reservationRepository) {
         // Bike's "reserve" needs Reservation's create command, and Reservation's "cancel" needs
         // Bike's release command — a genuine two-way dependency between the two modules. Building
         // both cross-cutting handlers here (from the shared repository instances) instead of inside
@@ -74,6 +74,13 @@ public class App {
         EndpointGroup bikeRoutes = BikeModule.routes(bikeRepository, createReservationCommand);
         EndpointGroup reservationRoutes = ReservationModule.routes(reservationRepository, createReservationCommand, releaseBikeCommand);
         EndpointGroup stationRoutes = StationModule.routes(dsl, bikeRepository, reservationRepository);
+
+        var reconciler = new BikeReservationReconciler(reservationRepository, bikeRepository);
+        var reservationExpiryJob = new ReservationExpiryJob(reservationRepository, new ExpireReservationUseCase(reservationRepository, releaseBikeCommand), clock, Duration.of(5, MINUTES));
+        Executors.newSingleThreadScheduledExecutor()
+                .scheduleWithFixedDelay(reconciler::reconcileCancelledReservations, 5, 5, TimeUnit.SECONDS);
+        Executors.newSingleThreadScheduledExecutor()
+                .scheduleWithFixedDelay(reservationExpiryJob::expireStale, 5, 5, TimeUnit.SECONDS);
 
         return Javalin.create(config -> {
             config.routes.apiBuilder(() -> {

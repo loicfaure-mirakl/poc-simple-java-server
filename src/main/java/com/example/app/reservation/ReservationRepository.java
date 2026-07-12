@@ -2,6 +2,7 @@ package com.example.app.reservation;
 
 import com.example.app.reservation.domain.Reservation;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,4 +19,6 @@ public interface ReservationRepository {
     Optional<Reservation> finish(UUID uuid);
 
     List<Reservation> findBlocked();
+
+    List<Reservation> findStales(Duration ttl);
 }
