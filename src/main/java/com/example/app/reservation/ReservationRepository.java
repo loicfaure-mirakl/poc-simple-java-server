@@ -16,5 +16,5 @@ public interface ReservationRepository {
 
     Optional<Reservation> updateStatus(UUID uuid, ReservationStatus reservationStatus);
 
-    List<Reservation> findByStatus(ReservationStatus status);
+    List<Reservation> findBlocked();
 }

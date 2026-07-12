@@ -1,6 +1,8 @@
 package com.example.app.reservation;
 
 import com.example.app.booking.CancelReservationCommand;
+import com.example.app.booking.FinishReservationCommand;
+import com.example.app.booking.FinishReservationUseCase;
 import com.example.app.reservation.domain.Reservation;
 import com.example.app.cqrs.CommandHandler;
 import com.example.app.reservation.domain.ReservationStatus;
@@ -18,16 +20,16 @@ public class ReservationController {
     private final ReservationQueryService reservationQueryService;
     private final CommandHandler<CreateReservationCommand, Reservation> createReservationCommand;
     private final CommandHandler<CancelReservationCommand, Reservation> cancelReservationCommand;
-    private final CommandHandler<UpdateReservationStatusCommand, Optional<Reservation>> updateReservationCommandHandler;
+    private final CommandHandler<FinishReservationCommand, Reservation> finishReservationCommand;
 
     public ReservationController(ReservationQueryService reservationQueryService,
                                  CommandHandler<CreateReservationCommand, Reservation> createReservationCommand,
                                  CommandHandler<CancelReservationCommand, Reservation> cancelReservationCommand,
-                                 CommandHandler<UpdateReservationStatusCommand, Optional<Reservation>> updateReservationCommandHandler) {
+                                 CommandHandler<FinishReservationCommand, Reservation> finishReservationCommand) {
         this.reservationQueryService = reservationQueryService;
         this.createReservationCommand = createReservationCommand;
         this.cancelReservationCommand = cancelReservationCommand;
-        this.updateReservationCommandHandler = updateReservationCommandHandler;
+        this.finishReservationCommand = finishReservationCommand;
     }
 
     void registerRoutes() {
@@ -47,11 +49,8 @@ public class ReservationController {
     private void finishReservation(Context context) {
         UUID reservationId = UUID.fromString(context.pathParam("id"));
 
-        updateReservationCommandHandler.handle(new UpdateReservationStatusCommand(reservationId, ReservationStatus.COMPLETED))
-                .ifPresentOrElse(
-                        context::json,
-                        () -> context.status(404).result("Reservation not found")
-                );
+        Reservation reservation = finishReservationCommand.handle(new FinishReservationCommand(reservationId));
+        context.json(reservation);
     }
 
     private void findReservation(Context context) {

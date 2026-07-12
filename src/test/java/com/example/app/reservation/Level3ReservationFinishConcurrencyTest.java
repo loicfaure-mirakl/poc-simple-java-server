@@ -34,12 +34,13 @@ import static com.example.app.jooq.generated.Tables.RESERVATION;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies Level 2 (see BIKE_FEATURES.md): cancelling a reservation must only succeed from
- * CREATED, must release the bike back to AVAILABLE, and under concurrent cancel attempts on the
- * same reservation exactly one must win (see BIKE_CONCURRENCY_HINTS.md — idempotency section).
+ * Verifies Level 3 (see BIKE_FEATURES.md): finishing a reservation must only succeed from
+ * CREATED, must release the bike back to AVAILABLE, and the CREATED -> {CANCELLED, COMPLETED}
+ * transition must be mutually exclusive even when cancel and finish race on the same
+ * reservation (see BIKE_CONCURRENCY_HINTS.md — enforce the state machine in the SQL predicate).
  */
 @Testcontainers
-class Level2ReservationCancelConcurrencyTest {
+class Level3ReservationFinishConcurrencyTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
@@ -66,50 +67,36 @@ class Level2ReservationCancelConcurrencyTest {
     }
 
     @Test
-    void cancellingCreatedReservationSucceedsAndReleasesBike() {
+    void finishingCreatedReservationSucceedsAndReleasesBike() {
         JavalinTest.test(app(), (server, client) -> {
             Bike bike = createBike(client, "bike-1");
             Reservation reservation = reserveBike(client, bike.id());
 
-            var response = client.put("/reservations/" + reservation.id() + "/cancel");
+            var response = client.put("/reservations/" + reservation.id() + "/finish");
 
             assertThat(response.code()).isEqualTo(200);
-            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.CANCELLED);
+            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.RETURNED);
             assertThat(bikeStatus(bike.id())).isEqualTo(Status.AVAILABLE);
         });
     }
 
     @Test
-    void cancellingUnknownReservationReturns404() {
+    void finishingUnknownReservationReturns404() {
         JavalinTest.test(app(), (server, client) -> {
-            var response = client.put("/reservations/" + UUID.randomUUID() + "/cancel");
+            var response = client.put("/reservations/" + UUID.randomUUID() + "/finish");
 
             assertThat(response.code()).isEqualTo(404);
         });
     }
 
     @Test
-    void cancellingAlreadyCancelledReservationReturns409() {
-        JavalinTest.test(app(), (server, client) -> {
-            Bike bike = createBike(client, "bike-1");
-            Reservation reservation = reserveBike(client, bike.id());
-            client.put("/reservations/" + reservation.id() + "/cancel");
-
-            var response = client.put("/reservations/" + reservation.id() + "/cancel");
-
-            assertThat(response.code()).isEqualTo(409);
-            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.CANCELLED);
-        });
-    }
-
-    @Test
-    void cancellingCompletedReservationReturns409() {
+    void finishingAlreadyCompletedReservationReturns409() {
         JavalinTest.test(app(), (server, client) -> {
             Bike bike = createBike(client, "bike-1");
             Reservation reservation = reserveBike(client, bike.id());
             client.put("/reservations/" + reservation.id() + "/finish");
 
-            var response = client.put("/reservations/" + reservation.id() + "/cancel");
+            var response = client.put("/reservations/" + reservation.id() + "/finish");
 
             assertThat(response.code()).isEqualTo(409);
             assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.RETURNED);
@@ -117,43 +104,86 @@ class Level2ReservationCancelConcurrencyTest {
     }
 
     @Test
-    void onlyOneConcurrentCancelWinsForSameReservation() throws Exception {
+    void finishingCancelledReservationReturns409() {
         JavalinTest.test(app(), (server, client) -> {
             Bike bike = createBike(client, "bike-1");
             Reservation reservation = reserveBike(client, bike.id());
-            int attempts = 20;
+            client.put("/reservations/" + reservation.id() + "/cancel");
 
-            ExecutorService pool = Executors.newFixedThreadPool(attempts);
-            CountDownLatch ready = new CountDownLatch(attempts);
-            CountDownLatch start = new CountDownLatch(1);
-            List<Future<Integer>> futures = new ArrayList<>();
+            var response = client.put("/reservations/" + reservation.id() + "/finish");
 
-            for (int i = 0; i < attempts; i++) {
-                futures.add(pool.submit(() -> {
-                    ready.countDown();
-                    start.await();
-                    return client.put("/reservations/" + reservation.id() + "/cancel").code();
-                }));
-            }
+            assertThat(response.code()).isEqualTo(409);
+            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.CANCELLED);
+        });
+    }
 
-            ready.await();
-            start.countDown();
+    @Test
+    void onlyOneConcurrentFinishWinsForSameReservation() throws Exception {
+        JavalinTest.test(app(), (server, client) -> {
+            Bike bike = createBike(client, "bike-1");
+            Reservation reservation = reserveBike(client, bike.id());
 
-            List<Integer> statusCodes = new ArrayList<>();
-            for (Future<Integer> future : futures) {
-                statusCodes.add(future.get(10, TimeUnit.SECONDS));
-            }
-            pool.shutdown();
+            List<Integer> statusCodes = raceConcurrently(20,
+                    i -> client.put("/reservations/" + reservation.id() + "/finish").code());
 
             assertThat(statusCodes).filteredOn(code -> code == 200).hasSize(1);
-            assertThat(statusCodes).filteredOn(code -> code == 409).hasSize(attempts - 1);
-            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.CANCELLED);
+            assertThat(statusCodes).filteredOn(code -> code == 409).hasSize(statusCodes.size() - 1);
+            assertThat(reservationStatus(reservation.id())).isEqualTo(ReservationStatus.RETURNED);
             assertThat(bikeStatus(bike.id())).isEqualTo(Status.AVAILABLE);
 
             // the bike must have been released exactly once and be reservable again
             var reReserve = client.post("/bikes/" + bike.id() + "/reserve");
             assertThat(reReserve.code()).isEqualTo(201);
         });
+    }
+
+    @Test
+    void onlyOneOfConcurrentCancelOrFinishWinsForSameReservation() throws Exception {
+        JavalinTest.test(app(), (server, client) -> {
+            Bike bike = createBike(client, "bike-1");
+            Reservation reservation = reserveBike(client, bike.id());
+
+            List<Integer> statusCodes = raceConcurrently(20,
+                    i -> i % 2 == 0
+                            ? client.put("/reservations/" + reservation.id() + "/cancel").code()
+                            : client.put("/reservations/" + reservation.id() + "/finish").code());
+
+            assertThat(statusCodes).filteredOn(code -> code == 200).hasSize(1);
+            assertThat(statusCodes).filteredOn(code -> code == 409).hasSize(statusCodes.size() - 1);
+
+            ReservationStatus finalStatus = reservationStatus(reservation.id());
+            assertThat(finalStatus).isIn(ReservationStatus.CANCELLED, ReservationStatus.RETURNED);
+            assertThat(bikeStatus(bike.id())).isEqualTo(Status.AVAILABLE);
+
+            var reReserve = client.post("/bikes/" + bike.id() + "/reserve");
+            assertThat(reReserve.code()).isEqualTo(201);
+        });
+    }
+
+    private List<Integer> raceConcurrently(int attempts, java.util.function.IntFunction<Integer> call) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(attempts);
+        CountDownLatch ready = new CountDownLatch(attempts);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Integer>> futures = new ArrayList<>();
+
+        for (int i = 0; i < attempts; i++) {
+            int index = i;
+            futures.add(pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                return call.apply(index);
+            }));
+        }
+
+        ready.await();
+        start.countDown();
+
+        List<Integer> results = new ArrayList<>();
+        for (Future<Integer> future : futures) {
+            results.add(future.get(10, TimeUnit.SECONDS));
+        }
+        pool.shutdown();
+        return results;
     }
 
     private Bike createBike(HttpClient client, String code) throws Exception {

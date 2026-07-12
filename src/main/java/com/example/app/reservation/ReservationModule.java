@@ -3,6 +3,7 @@ package com.example.app.reservation;
 import com.example.app.bike.UpdateBikeStatusCommand;
 import com.example.app.bike.domain.Bike;
 import com.example.app.booking.CancelReservationUseCase;
+import com.example.app.booking.FinishReservationUseCase;
 import com.example.app.cqrs.CommandHandler;
 import com.example.app.reservation.domain.Reservation;
 import io.javalin.apibuilder.EndpointGroup;
@@ -20,7 +21,7 @@ public class ReservationModule {
                 new ReservationQueryService(repository),
                 createReservationCommand,
                 new CancelReservationUseCase(repository, releaseBikeCommand),
-                new UpdateReservationStatusCommandHandler(repository));
+                new FinishReservationUseCase(repository, releaseBikeCommand));
         return controller::registerRoutes;
     }
 }

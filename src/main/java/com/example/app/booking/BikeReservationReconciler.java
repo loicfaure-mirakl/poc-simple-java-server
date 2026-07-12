@@ -4,7 +4,6 @@ import com.example.app.bike.BikeRepository;
 import com.example.app.bike.domain.Status;
 import com.example.app.reservation.ReservationRepository;
 import com.example.app.reservation.domain.Reservation;
-import com.example.app.reservation.domain.ReservationStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +27,7 @@ public class BikeReservationReconciler {
     }
 
     public void reconcileCancelledReservations() {
-        for (Reservation reservation : reservationRepository.findByStatus(ReservationStatus.CANCELLED)) {
+        for (Reservation reservation : reservationRepository.findBlocked()) {
             bikeRepository.findById(reservation.bikeId())
                     .filter(bike -> bike.status() == Status.RESERVED)
                     .ifPresent(bike -> {

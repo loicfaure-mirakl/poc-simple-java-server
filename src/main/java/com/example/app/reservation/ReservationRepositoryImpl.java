@@ -54,9 +54,9 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     }
 
     @Override
-    public List<Reservation> findByStatus(ReservationStatus status) {
+    public List<Reservation> findBlocked() {
         return dsl.selectFrom(RESERVATION)
-                .where(RESERVATION.STATUS.eq(status.name()))
+                .where(RESERVATION.STATUS.in(ReservationStatus.CANCELLED.name(), ReservationStatus.RETURNED.name()))
                 .fetchInto(Reservation.class);
     }
 }
