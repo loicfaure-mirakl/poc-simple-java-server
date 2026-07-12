@@ -19,6 +19,7 @@ import com.example.app.reservation.ReservationModule;
 import com.example.app.reservation.ReservationRepository;
 import com.example.app.reservation.ReservationRepositoryImpl;
 import com.example.app.reservation.domain.Reservation;
+import com.example.app.station.StationModule;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.HttpStatus;
@@ -72,6 +73,7 @@ public class App {
 
         EndpointGroup bikeRoutes = BikeModule.routes(bikeRepository, createReservationCommand);
         EndpointGroup reservationRoutes = ReservationModule.routes(reservationRepository, createReservationCommand, releaseBikeCommand);
+        EndpointGroup stationRoutes = StationModule.routes(dsl, bikeRepository, reservationRepository);
 
         return Javalin.create(config -> {
             config.routes.apiBuilder(() -> {
@@ -79,6 +81,7 @@ public class App {
                 PersonModule.routes(dsl).addEndpoints();
                 bikeRoutes.addEndpoints();
                 reservationRoutes.addEndpoints();
+                stationRoutes.addEndpoints();
             });
             config.routes.exception(NotFoundException.class, (e, ctx) ->
                     ctx.status(HttpStatus.NOT_FOUND).json(Map.of("error", e.getMessage())));

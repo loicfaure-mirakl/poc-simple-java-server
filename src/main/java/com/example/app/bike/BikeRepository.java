@@ -17,4 +17,5 @@ public interface BikeRepository {
 
     Optional<Bike> release(UUID uuid);
 
+    Optional<Bike> reserveAny(UUID stationId);
 }
