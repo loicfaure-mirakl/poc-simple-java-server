@@ -34,7 +34,7 @@ public class CancelReservationUseCase implements CommandHandler<CancelReservatio
         // side effect on the other aggregate: if it keeps failing we do NOT undo the
         // cancellation (that would misrepresent a decision the caller already made); we retry
         // a few times inline, and if it's still stuck, BikeReservationReconciler catches up later.
-        Reservation reservation = reservationRepository.updateStatus(command.reservationId(), ReservationStatus.CANCELLED)
+        Reservation reservation = reservationRepository.cancel(command.reservationId())
                 .orElseGet(() -> failToCancel(command.reservationId()));
 
         releaseBikeWithRetry(reservation.bikeId());

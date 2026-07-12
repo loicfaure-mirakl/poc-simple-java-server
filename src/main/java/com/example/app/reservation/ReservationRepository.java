@@ -1,7 +1,6 @@
 package com.example.app.reservation;
 
 import com.example.app.reservation.domain.Reservation;
-import com.example.app.reservation.domain.ReservationStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,7 +13,9 @@ public interface ReservationRepository {
 
     Reservation create(UUID bikeId);
 
-    Optional<Reservation> updateStatus(UUID uuid, ReservationStatus reservationStatus);
+    Optional<Reservation> cancel(UUID uuid);
+
+    Optional<Reservation> finish(UUID uuid);
 
     List<Reservation> findBlocked();
 }

@@ -44,11 +44,21 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     }
 
     @Override
-    public Optional<Reservation> updateStatus(UUID uuid, ReservationStatus reservationStatus) {
+    public Optional<Reservation> cancel(UUID uuid) {
         return dsl.update(RESERVATION)
-                .set(RESERVATION.STATUS, reservationStatus.name())
+                .set(RESERVATION.STATUS, ReservationStatus.CANCELLED.name())
                 .where(RESERVATION.ID.eq(uuid))
-                .and(RESERVATION.STATUS.ne(reservationStatus.name()))
+                .and(RESERVATION.STATUS.eq(ReservationStatus.CREATED.name()))
+                .returning()
+                .fetchOptionalInto(Reservation.class);
+    }
+
+    @Override
+    public Optional<Reservation> finish(UUID uuid) {
+        return dsl.update(RESERVATION)
+                .set(RESERVATION.STATUS, ReservationStatus.RETURNED.name())
+                .where(RESERVATION.ID.eq(uuid))
+                .and(RESERVATION.STATUS.eq(ReservationStatus.CREATED.name()))
                 .returning()
                 .fetchOptionalInto(Reservation.class);
     }
