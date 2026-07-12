@@ -9,11 +9,20 @@ import com.example.app.bike.domain.Bike;
 import com.example.app.bike.domain.Status;
 import com.example.app.config.Database;
 import com.example.app.cqrs.CommandHandler;
+import com.example.app.reservation.CreateReservationCommandHandler;
 import com.example.app.reservation.ReservationExpiryJob;
 import com.example.app.reservation.ReservationRepository;
 import com.example.app.reservation.ReservationRepositoryImpl;
 import com.example.app.reservation.domain.Reservation;
 import com.example.app.reservation.domain.ReservationStatus;
+import com.example.app.station.Station;
+import com.example.app.station.StationBikeReleaseCommand;
+import com.example.app.station.StationReleaseCommandHandler;
+import com.example.app.station.StationRepository;
+import com.example.app.station.StationRepositoryImpl;
+import com.example.app.station.waitlist.WaitListCommandHandler;
+import com.example.app.station.waitlist.WaitListRepository;
+import com.example.app.station.waitlist.WaitListRepositoryImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.javalin.Javalin;
@@ -88,8 +97,14 @@ class Level5ReservationExpiryConcurrencyTest {
     private ReservationExpiryJob expiryJob() {
         ReservationRepository reservationRepository = new ReservationRepositoryImpl(dsl, clock);
         BikeRepository bikeRepository = new BikeRepositoryImpl(dsl);
+        StationRepository stationRepository = new StationRepositoryImpl(dsl);
+        WaitListRepository waitListRepository = new WaitListRepositoryImpl(dsl, clock);
+        CreateReservationCommandHandler createReservationCommandHandler = new CreateReservationCommandHandler(reservationRepository);
+        WaitListCommandHandler waitListCommandHandler = new WaitListCommandHandler(new ReserveStationBikeUseCase(bikeRepository, createReservationCommandHandler, stationRepository),
+                waitListRepository);
+        CommandHandler<StationBikeReleaseCommand, Station> stationCommandHandler = new StationReleaseCommandHandler(stationRepository, waitListCommandHandler);
         CommandHandler<UpdateBikeStatusCommand, Optional<Bike>> releaseBikeCommand =
-                new UpdateBikeStatusCommandHandler(bikeRepository);
+                new UpdateBikeStatusCommandHandler(bikeRepository, stationCommandHandler);
         return new ReservationExpiryJob(reservationRepository, new ExpireReservationUseCase(reservationRepository, releaseBikeCommand), clock, TTL);
     }
 

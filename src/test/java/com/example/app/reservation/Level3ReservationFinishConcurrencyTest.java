@@ -58,7 +58,7 @@ class Level3ReservationFinishConcurrencyTest {
 
     @BeforeEach
     void clearTables() {
-        dsl.truncate(RESERVATION).execute();
+        dsl.truncate(RESERVATION).cascade().execute();
         dsl.truncate(BIKE).cascade().execute();
     }
 

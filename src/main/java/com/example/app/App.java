@@ -8,6 +8,7 @@ import com.example.app.bike.UpdateBikeStatusCommandHandler;
 import com.example.app.bike.domain.Bike;
 import com.example.app.booking.BikeReservationReconciler;
 import com.example.app.booking.ExpireReservationUseCase;
+import com.example.app.booking.ReserveStationBikeUseCase;
 import com.example.app.config.AppConfig;
 import com.example.app.config.Database;
 import com.example.app.cqrs.CommandHandler;
@@ -21,7 +22,17 @@ import com.example.app.reservation.ReservationModule;
 import com.example.app.reservation.ReservationRepository;
 import com.example.app.reservation.ReservationRepositoryImpl;
 import com.example.app.reservation.domain.Reservation;
+import com.example.app.station.Station;
+import com.example.app.station.StationBikeReleaseCommand;
 import com.example.app.station.StationModule;
+import com.example.app.station.StationReleaseCommandHandler;
+import com.example.app.station.StationRepository;
+import com.example.app.station.StationRepositoryImpl;
+import com.example.app.station.waitlist.FreedBikeCommand;
+import com.example.app.station.waitlist.WaitList;
+import com.example.app.station.waitlist.WaitListCommandHandler;
+import com.example.app.station.waitlist.WaitListRepository;
+import com.example.app.station.waitlist.WaitListRepositoryImpl;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.HttpStatus;
@@ -66,14 +77,23 @@ public class App {
         // Bike's release command — a genuine two-way dependency between the two modules. Building
         // both cross-cutting handlers here (from the shared repository instances) instead of inside
         // either module's own routes() breaks the cycle without constructing anything twice.
+        WaitListRepository  waitListRepository = new WaitListRepositoryImpl(dsl, clock);
+        StationRepository stationRepository = new StationRepositoryImpl(dsl);
         CommandHandler<CreateReservationCommand, Reservation> createReservationCommand =
                 new CreateReservationCommandHandler(reservationRepository);
+        ReserveStationBikeUseCase reserveStationBikeUseCase = new ReserveStationBikeUseCase(
+                bikeRepository,
+                createReservationCommand,
+                new StationRepositoryImpl(dsl)
+        );
+        CommandHandler<FreedBikeCommand, WaitList> waitListCommandHandler = new WaitListCommandHandler(reserveStationBikeUseCase, waitListRepository);
+        CommandHandler<StationBikeReleaseCommand, Station> stationCommandHandler = new StationReleaseCommandHandler(stationRepository, waitListCommandHandler);
         CommandHandler<UpdateBikeStatusCommand, Optional<Bike>> releaseBikeCommand =
-                new UpdateBikeStatusCommandHandler(bikeRepository);
+                new UpdateBikeStatusCommandHandler(bikeRepository, stationCommandHandler);
 
         EndpointGroup bikeRoutes = BikeModule.routes(bikeRepository, createReservationCommand);
         EndpointGroup reservationRoutes = ReservationModule.routes(reservationRepository, createReservationCommand, releaseBikeCommand);
-        EndpointGroup stationRoutes = StationModule.routes(dsl, bikeRepository, reservationRepository);
+        EndpointGroup stationRoutes = StationModule.routes(dsl, bikeRepository, reservationRepository, clock);
 
         var reconciler = new BikeReservationReconciler(reservationRepository, bikeRepository);
         var reservationExpiryJob = new ReservationExpiryJob(reservationRepository, new ExpireReservationUseCase(reservationRepository, releaseBikeCommand), clock, Duration.of(5, MINUTES));

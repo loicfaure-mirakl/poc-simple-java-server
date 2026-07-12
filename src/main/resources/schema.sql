@@ -28,3 +28,13 @@ CREATE TABLE IF NOT EXISTS "reservation"
     "status"     TEXT        NOT NULL,
     "created_at" TIMESTAMPTZ NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS "waitlist_entry"
+(
+    "id"             UUID PRIMARY KEY,
+    "seq"            INT GENERATED ALWAYS AS IDENTITY,
+    "station_id"     UUID        NOT NULL REFERENCES "station" ("id"),
+    "status"         TEXT        NOT NULL,
+    "reservation_id" UUID REFERENCES "reservation" ("id"),
+    "created_at"     TIMESTAMPTZ NOT NULL
+);

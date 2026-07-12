@@ -30,4 +30,14 @@ public class StationRepositoryImpl implements StationRepository {
                 .where(STATION.ID.eq(stationId))
                 .fetchOptionalInto(Station.class);
     }
+
+    @Override
+    public Optional<Station> release(UUID stationId) {
+        return dsl.update(STATION)
+                .set(STATION.AVAILABLE_COUNT, STATION.AVAILABLE_COUNT.plus(1))
+                .where(STATION.ID.eq(stationId))
+                .and(STATION.CAPACITY.gt(STATION.AVAILABLE_COUNT)) // Avoid having more capacity
+                .returning()
+                .fetchOptionalInto(Station.class);
+    }
 }
