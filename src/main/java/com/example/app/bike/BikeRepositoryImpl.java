@@ -82,4 +82,14 @@ public class BikeRepositoryImpl implements BikeRepository {
                 .returning()
                 .fetchOptionalInto(Bike.class);
     }
+
+    @Override
+    public List<Bike> batchReserve(List<UUID> uuids) {
+        return dsl.update(BIKE)
+                .set(BIKE.STATUS, Status.RESERVED.name())
+                .where(BIKE.ID.in(uuids))
+                .and(BIKE.STATUS.eq(Status.AVAILABLE.name()))
+                .returning()
+                .fetchInto(Bike.class);
+    }
 }

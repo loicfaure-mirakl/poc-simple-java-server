@@ -18,4 +18,6 @@ public interface BikeRepository {
     Optional<Bike> release(UUID uuid);
 
     Optional<Bike> reserveAny(UUID stationId);
+
+    List<Bike> batchReserve(List<UUID> uuids);
 }
